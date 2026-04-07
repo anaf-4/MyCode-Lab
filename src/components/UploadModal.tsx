@@ -275,7 +275,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
       path: pf.path,
     }));
 
-    await saveSnippetsBatch(snippets);
+    await saveSnippetsBatch(snippets, repoId);
     setSaving(false);
     router.push(`/repo/${repoId}`);
     resetAndClose();
