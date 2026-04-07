@@ -9,20 +9,7 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import {
-  CodeSnippet,
-  Repository,
-  getStandaloneSnippets,
-  getAllRepos,
-  addSnippet as dbAddSnippet,
-  addSnippetsBatch,
-  updateSnippet as dbUpdateSnippet,
-  deleteSnippet as dbDeleteSnippet,
-  deleteSnippetsByRepo,
-  addRepo as dbAddRepo,
-  updateRepo as dbUpdateRepo,
-  deleteRepo as dbDeleteRepo,
-} from '@/lib/db';
+import { CodeSnippet, Repository } from '@/lib/db';
 
 interface SnippetsContextType {
   snippets: CodeSnippet[];
@@ -30,7 +17,7 @@ interface SnippetsContextType {
   loading: boolean;
   refresh: () => Promise<void>;
   saveSnippet: (snippet: CodeSnippet) => Promise<void>;
-  saveSnippetsBatch: (snippets: CodeSnippet[]) => Promise<void>;
+  saveSnippetsBatch: (snippets: CodeSnippet[], repositoryId?: string) => Promise<void>;
   updateSnippet: (id: string, updates: Partial<CodeSnippet>) => Promise<void>;
   deleteSnippet: (id: string) => Promise<void>;
   saveRepo: (repo: Repository) => Promise<void>;
@@ -40,6 +27,19 @@ interface SnippetsContextType {
 
 const SnippetsContext = createContext<SnippetsContextType | null>(null);
 
+// API helpers
+async function apiFetch(url: string, options?: RequestInit) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
 export function SnippetsProvider({ children }: { children: ReactNode }) {
   const [snippets, setSnippets] = useState<CodeSnippet[]>([]);
   const [repos, setRepos] = useState<Repository[]>([]);
@@ -48,11 +48,11 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
   const loadData = useCallback(async () => {
     try {
       const [snippetsData, reposData] = await Promise.all([
-        getStandaloneSnippets(),
-        getAllRepos(),
+        apiFetch('/api/snippets'),
+        apiFetch('/api/repos'),
       ]);
-      setSnippets(snippetsData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
-      setRepos(reposData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+      setSnippets(snippetsData);
+      setRepos(reposData);
     } catch (err) {
       console.error('Failed to load data:', err);
     } finally {
@@ -70,16 +70,25 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const saveSnippet = useCallback(async (snippet: CodeSnippet) => {
     try {
-      await dbAddSnippet(snippet);
+      await apiFetch('/api/snippets', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...snippet,
+          repository_id: snippet.repositoryId || null,
+        }),
+      });
       setSnippets((prev) => [snippet, ...prev]);
     } catch (err) {
       console.error('Failed to save snippet:', err);
     }
   }, []);
 
-  const saveSnippetsBatch = useCallback(async (newSnippets: CodeSnippet[]) => {
+  const saveSnippetsBatch = useCallback(async (newSnippets: CodeSnippet[], repositoryId?: string) => {
     try {
-      await addSnippetsBatch(newSnippets);
+      await apiFetch('/api/snippets/batch', {
+        method: 'POST',
+        body: JSON.stringify({ snippets: newSnippets, repositoryId }),
+      });
       setSnippets((prev) => [...newSnippets, ...prev]);
     } catch (err) {
       console.error('Failed to save snippets batch:', err);
@@ -88,7 +97,10 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const updateSnippet = useCallback(async (id: string, updates: Partial<CodeSnippet>) => {
     try {
-      await dbUpdateSnippet(id, updates);
+      await apiFetch(`/api/snippets/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
       setSnippets((prev) =>
         prev.map((s) =>
           s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
@@ -101,7 +113,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const deleteSnippet = useCallback(async (id: string) => {
     try {
-      await dbDeleteSnippet(id);
+      await apiFetch(`/api/snippets/${id}`, { method: 'DELETE' });
       setSnippets((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Failed to delete snippet:', err);
@@ -110,7 +122,10 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const saveRepo = useCallback(async (repo: Repository) => {
     try {
-      await dbAddRepo(repo);
+      await apiFetch('/api/repos', {
+        method: 'POST',
+        body: JSON.stringify(repo),
+      });
       setRepos((prev) => [repo, ...prev]);
     } catch (err) {
       console.error('Failed to save repo:', err);
@@ -119,7 +134,10 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const updateRepoData = useCallback(async (id: string, updates: Partial<Repository>) => {
     try {
-      await dbUpdateRepo(id, updates);
+      await apiFetch(`/api/repos/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
       setRepos((prev) =>
         prev.map((r) =>
           r.id === id ? { ...r, ...updates, updatedAt: new Date().toISOString() } : r
@@ -132,7 +150,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const deleteRepo = useCallback(async (id: string) => {
     try {
-      await dbDeleteRepo(id);
+      await apiFetch(`/api/repos/${id}`, { method: 'DELETE' });
       setRepos((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       console.error('Failed to delete repo:', err);

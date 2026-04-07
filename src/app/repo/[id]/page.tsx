@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import JSZip from 'jszip';
-import { getRepoById, getSnippetsByRepo, CodeSnippet, Repository, getLanguageIcon, getLanguageColor, formatFileSize, deleteRepo } from '@/lib/db';
+import { CodeSnippet, Repository, getLanguageIcon, getLanguageColor, formatFileSize } from '@/lib/db';
 import { useSnippets } from '@/context/SnippetsContext';
 import CodeEditor from '@/components/CodeEditor';
 import ExecutionPanel from '@/components/ExecutionPanel';
@@ -141,7 +141,7 @@ export default function RepoPage() {
   const router = useRouter();
   const id = params.id as string;
   const { theme, toggleTheme } = useTheme();
-  const { snippets: allSnippets, updateSnippet, deleteSnippet: deleteSnippetFromContext, refresh } = useSnippets();
+  const { snippets: allSnippets, updateSnippet, deleteSnippet: deleteSnippetFromContext, deleteRepo, refresh } = useSnippets();
 
   const [repo, setRepo] = useState<Repository | null>(null);
   const [snippets, setSnippets] = useState<CodeSnippet[]>([]);
@@ -154,15 +154,21 @@ export default function RepoPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const repoData = await getRepoById(id);
-      const snippetData = await getSnippetsByRepo(id);
-      if (repoData) {
-        setRepo(repoData);
-        setSnippets(snippetData.sort((a, b) => (a.path || '').localeCompare(b.path || '')));
-        if (snippetData.length > 0) {
-          setSelectedSnippet(snippetData[0]);
-          setCode(snippetData[0].code);
+      try {
+        const [repoData, snippetData] = await Promise.all([
+          fetch(`/api/repos/${id}`).then((r) => r.json()),
+          fetch(`/api/repos/${id}/snippets`).then((r) => r.json()),
+        ]);
+        if (repoData && !repoData.error) {
+          setRepo(repoData);
+          setSnippets(snippetData.sort((a: CodeSnippet, b: CodeSnippet) => (a.path || '').localeCompare(b.path || '')));
+          if (snippetData.length > 0) {
+            setSelectedSnippet(snippetData[0]);
+            setCode(snippetData[0].code);
+          }
         }
+      } catch (err) {
+        console.error('Failed to load repo:', err);
       }
     };
     loadData();
