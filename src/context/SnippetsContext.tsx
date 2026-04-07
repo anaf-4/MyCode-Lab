@@ -87,11 +87,15 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
 
   const saveSnippetsBatch = useCallback(async (newSnippets: CodeSnippet[], repositoryId?: string) => {
     try {
-      console.log('[Context] Saving batch:', newSnippets.length, 'snippets, repoId:', repositoryId);
-      await apiFetch('/api/snippets/batch', {
-        method: 'POST',
-        body: JSON.stringify({ snippets: newSnippets, repositoryId }),
-      });
+      const CHUNK_SIZE = 10;
+      for (let i = 0; i < newSnippets.length; i += CHUNK_SIZE) {
+        const chunk = newSnippets.slice(i, i + CHUNK_SIZE);
+        console.log('[Context] Saving batch:', chunk.length, 'snippets, repoId:', repositoryId);
+        await apiFetch('/api/snippets/batch', {
+          method: 'POST',
+          body: JSON.stringify({ snippets: chunk, repositoryId }),
+        });
+      }
       setSnippets((prev) => [...newSnippets, ...prev]);
     } catch (err) {
       console.error('Failed to save snippets batch:', err);
