@@ -1,8 +1,29 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --sidebar-bg: #f9fafb;
+  --sidebar-border: #e5e7eb;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --input-bg: #f3f4f6;
+  --input-border: #e5e7eb;
+  --hover-bg: #f3f4f6;
+}
+
+.dark {
+  --background: #0f1117;
+  --foreground: #e5e7eb;
+  --sidebar-bg: #161822;
+  --sidebar-border: #1f2233;
+  --card-bg: #1a1d2e;
+  --card-border: #2a2d3e;
+  --input-bg: #1e2132;
+  --input-border: #2a2d3e;
+  --hover-bg: #1e2132;
 }
 
 @theme inline {
@@ -12,15 +33,44 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  border-radius: 3px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* Monaco editor overrides */
+.monaco-editor .overflow-guard,
+.monaco-editor .monaco-scrollable-element {
+  border-radius: 0;
+}
+
+/* Smooth transitions for dark mode */
+* {
+  transition-property: background-color, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+pre, code {
+  transition: none;
 }
