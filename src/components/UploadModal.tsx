@@ -35,6 +35,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   // Shared
   const [isDragging, setIsDragging] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -221,64 +222,78 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const handleSaveSingle = useCallback(async () => {
     if (!title.trim() || !code.trim()) return;
     setSaving(true);
+    setSaveError(null);
 
-    const now = new Date().toISOString();
-    const snippet: CodeSnippet = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      language,
-      code,
-      tags,
-      createdAt: now,
-      updatedAt: now,
-    };
+    try {
+      const now = new Date().toISOString();
+      const snippet: CodeSnippet = {
+        id: Date.now().toString(),
+        title: title.trim(),
+        language,
+        code,
+        tags,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    await addSnippet(snippet);
-    setSaving(false);
-    router.push(`/view/${snippet.id}`);
-    resetAndClose();
+      await addSnippet(snippet);
+      setSaving(false);
+      router.push(`/view/${snippet.id}`);
+      resetAndClose();
+    } catch (err) {
+      console.error('Save failed:', err);
+      setSaveError(err instanceof Error ? err.message : 'Failed to save');
+      setSaving(false);
+    }
   }, [title, code, language, tags, router, addSnippet]);
 
   const handleSaveFolder = useCallback(async () => {
     if (pendingFiles.length === 0 || !repoName.trim()) return;
     setSaving(true);
+    setSaveError(null);
 
-    const now = new Date().toISOString();
-    const repoId = `repo_${Date.now()}`;
+    try {
+      const now = new Date().toISOString();
+      const repoId = `repo_${Date.now()}`;
 
-    // Create repository
-    const langSet = new Set(pendingFiles.map((f) => f.language));
-    const repo: Repository = {
-      id: repoId,
-      name: repoName.trim(),
-      description: repoDescription.trim(),
-      tags: folderTags,
-      createdAt: now,
-      updatedAt: now,
-      fileCount: pendingFiles.length,
-      totalSize: pendingFiles.reduce((sum, f) => sum + f.size, 0),
-      languages: Array.from(langSet),
-    };
+      // Create repository
+      const langSet = new Set(pendingFiles.map((f) => f.language));
+      const repo: Repository = {
+        id: repoId,
+        name: repoName.trim(),
+        description: repoDescription.trim(),
+        tags: folderTags,
+        createdAt: now,
+        updatedAt: now,
+        fileCount: pendingFiles.length,
+        totalSize: pendingFiles.reduce((sum, f) => sum + f.size, 0),
+        languages: Array.from(langSet),
+      };
 
-    await saveRepo(repo);
+      await saveRepo(repo);
 
-    // Create snippets for each file
-    const snippets: CodeSnippet[] = pendingFiles.map((pf, i) => ({
-      id: `${repoId}_${i}`,
-      title: pf.path.split('/').pop() || pf.path,
-      language: pf.language,
-      code: pf.content,
-      tags: folderTags,
-      createdAt: now,
-      updatedAt: now,
-      repositoryId: repoId,
-      path: pf.path,
-    }));
+      // Create snippets for each file
+      const snippets: CodeSnippet[] = pendingFiles.map((pf, i) => ({
+        id: `${repoId}_${i}`,
+        title: pf.path.split('/').pop() || pf.path,
+        language: pf.language,
+        code: pf.content,
+        tags: folderTags,
+        createdAt: now,
+        updatedAt: now,
+        repositoryId: repoId,
+        path: pf.path,
+      }));
 
-    await saveSnippetsBatch(snippets, repoId);
-    setSaving(false);
-    router.push(`/repo/${repoId}`);
-    resetAndClose();
+      await saveSnippetsBatch(snippets, repoId);
+      setSaving(false);
+      router.push(`/repo/${repoId}`);
+      resetAndClose();
+    } catch (err) {
+      console.error('Save failed:', err);
+      setSaveError(err instanceof Error ? err.message : 'Failed to save');
+      setSaving(false);
+    }
   }, [pendingFiles, repoName, repoDescription, folderTags, router, saveRepo, saveSnippetsBatch]);
 
   const resetAndClose = () => {
@@ -569,6 +584,18 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
             </>
           )}
         </div>
+
+        {/* Error Message */}
+        {saveError && (
+          <div className="px-6 py-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Error: {saveError}
+            </p>
+            <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+              Check browser console (F12) for details. Make sure MySQL is accessible.
+            </p>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">

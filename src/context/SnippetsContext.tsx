@@ -130,7 +130,11 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
     try {
       await apiFetch('/api/repos', {
         method: 'POST',
-        body: JSON.stringify(repo),
+        body: JSON.stringify({
+          ...repo,
+          file_count: repo.fileCount,
+          total_size: repo.totalSize,
+        }),
       });
       setRepos((prev) => [repo, ...prev]);
     } catch (err) {
