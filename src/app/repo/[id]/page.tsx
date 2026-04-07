@@ -155,10 +155,13 @@ export default function RepoPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('[RepoPage] Loading data for id:', id);
         const [repoData, snippetData] = await Promise.all([
           fetch(`/api/repos/${id}`).then((r) => r.json()),
           fetch(`/api/repos/${id}/snippets`).then((r) => r.json()),
         ]);
+        console.log('[RepoPage] Fetched repo:', repoData);
+        console.log('[RepoPage] Fetched snippets:', snippetData);
         if (repoData && !repoData.error) {
           setRepo(repoData);
           setSnippets(snippetData.sort((a: CodeSnippet, b: CodeSnippet) => (a.path || '').localeCompare(b.path || '')));
