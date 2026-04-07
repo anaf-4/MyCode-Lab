@@ -27,17 +27,18 @@ interface SnippetsContextType {
 
 const SnippetsContext = createContext<SnippetsContextType | null>(null);
 
-// API helpers
 async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `API error: ${res.status}`);
+    const errMsg = data?.error || res.statusText || `API error: ${res.status}`;
+    console.error(`[apiFetch] ${url} failed:`, errMsg, data);
+    throw new Error(errMsg);
   }
-  return res.json();
+  return data;
 }
 
 export function SnippetsProvider({ children }: { children: ReactNode }) {
@@ -80,11 +81,13 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       setSnippets((prev) => [snippet, ...prev]);
     } catch (err) {
       console.error('Failed to save snippet:', err);
+      throw err;
     }
   }, []);
 
   const saveSnippetsBatch = useCallback(async (newSnippets: CodeSnippet[], repositoryId?: string) => {
     try {
+      console.log('[Context] Saving batch:', newSnippets.length, 'snippets, repoId:', repositoryId);
       await apiFetch('/api/snippets/batch', {
         method: 'POST',
         body: JSON.stringify({ snippets: newSnippets, repositoryId }),
@@ -92,6 +95,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       setSnippets((prev) => [...newSnippets, ...prev]);
     } catch (err) {
       console.error('Failed to save snippets batch:', err);
+      throw err;
     }
   }, []);
 
@@ -108,6 +112,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       );
     } catch (err) {
       console.error('Failed to update snippet:', err);
+      throw err;
     }
   }, []);
 
@@ -117,6 +122,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       setSnippets((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Failed to delete snippet:', err);
+      throw err;
     }
   }, []);
 
@@ -129,6 +135,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       setRepos((prev) => [repo, ...prev]);
     } catch (err) {
       console.error('Failed to save repo:', err);
+      throw err;
     }
   }, []);
 
@@ -145,6 +152,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       );
     } catch (err) {
       console.error('Failed to update repo:', err);
+      throw err;
     }
   }, []);
 
@@ -154,6 +162,7 @@ export function SnippetsProvider({ children }: { children: ReactNode }) {
       setRepos((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       console.error('Failed to delete repo:', err);
+      throw err;
     }
   }, []);
 

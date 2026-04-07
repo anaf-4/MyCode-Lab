@@ -6,6 +6,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { snippets, repositoryId } = body;
 
+    console.log('[Batch API] Received:', {
+      snippetCount: snippets?.length,
+      repositoryId,
+      firstSnippet: snippets?.[0] ? {
+        id: snippets[0].id,
+        title: snippets[0].title,
+        codeLength: snippets[0].code?.length,
+      } : null,
+    });
+
     if (!Array.isArray(snippets) || snippets.length === 0) {
       return NextResponse.json({ error: 'Snippets array required' }, { status: 400 });
     }
@@ -16,7 +26,9 @@ export async function POST(request: NextRequest) {
     try {
       await conn.beginTransaction();
 
-      for (const s of snippets) {
+      for (let i = 0; i < snippets.length; i++) {
+        const s = snippets[i];
+        console.log(`[Batch API] Inserting snippet ${i + 1}/${snippets.length}: ${s.title}`);
         await conn.query(
           `INSERT INTO snippets (id, title, language, code, tags, repository_id, path)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -33,14 +45,17 @@ export async function POST(request: NextRequest) {
       }
 
       await conn.commit();
+      console.log('[Batch API] Success: committed', snippets.length, 'snippets');
       return NextResponse.json({ success: true, count: snippets.length }, { status: 201 });
     } catch (err) {
       await conn.rollback();
+      console.error('[Batch API] Transaction failed, rolled back:', err);
       throw err;
     } finally {
       conn.release();
     }
   } catch (err) {
+    console.error('[Batch API] Error:', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

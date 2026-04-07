@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/mysql';
+import type { RowDataPacket } from 'mysql2';
+
+function toCamelCase(row: RowDataPacket): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    result[camelKey] = value;
+    if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+      try { result[camelKey] = JSON.parse(value); } catch { /* ignore */ }
+    }
+  }
+  return result;
+}
 
 export async function GET(
   request: NextRequest,
@@ -8,11 +21,11 @@ export async function GET(
   try {
     const { id } = await params;
     const pool = getPool();
-    const [rows] = await pool.query(
+    const [rows] = await pool.query<RowDataPacket[]>(
       'SELECT * FROM snippets WHERE repository_id = ? ORDER BY path ASC',
       [id]
     );
-    return NextResponse.json(rows);
+    return NextResponse.json(rows.map(toCamelCase));
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
